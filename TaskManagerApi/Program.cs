@@ -7,6 +7,16 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowAll", policy =>
+    {
+        policy.AllowAnyOrigin()
+              .AllowAnyHeader()
+              .AllowAnyMethod();
+    });
+});
+
 //task manager context
 builder.Services.AddDbContext<TaskManagerContext>(options => options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
@@ -22,6 +32,7 @@ if (app.Environment.IsDevelopment())
 app.UseMiddleware<TaskManagerApi.Middlewares.ExceptionHandlingMiddleware>();
 
 app.UseHttpsRedirection();
+app.UseCors("AllowAll");
 app.UseAuthorization();
 app.MapControllers();
 
