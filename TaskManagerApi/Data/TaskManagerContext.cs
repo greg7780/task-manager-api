@@ -1,4 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using TaskManagerApi.Handlers;
 using TaskManagerApi.Models;
 
 namespace TaskManagerApi.Data
@@ -8,6 +9,8 @@ namespace TaskManagerApi.Data
         public TaskManagerContext(DbContextOptions<TaskManagerContext> options) : base(options) { }
 
         public DbSet<TaskItem> TaskItems { get; set; }
+        public DbSet<User> Users { get; set; }
+        public DbSet<RefreshToken> RefreshTokens { get; set; }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -43,6 +46,44 @@ namespace TaskManagerApi.Data
 
                 entity.Property(e => e.ModifiedAt);
             });
+
+            modelBuilder.Entity<User>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+
+                entity.Property(e => e.Username)
+                    .IsRequired()
+                    .HasMaxLength(255);
+
+                entity.Property(e => e.Password)
+                      .IsRequired();
+
+                entity.Property(e => e.Deleted)
+                      .HasDefaultValue(false);
+            });
+
+            modelBuilder.Entity<RefreshToken>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+
+                entity.Property(e => e.Token).IsRequired();
+                entity.Property(e => e.Expires).IsRequired();
+
+                entity.HasOne(e => e.User)
+                    .WithMany()
+                    .HasForeignKey(e => e.UserId)
+                    .OnDelete(DeleteBehavior.Cascade);
+            });
+
+            modelBuilder.Entity<User>().HasData([
+                new User
+                {
+                    Id = 1,
+                    Username = "admin",
+                    Password = "AQAAAAIAACcQAAAAEKsV+Q9q+HiqBHRwdK9JBk3e9aPPV/PB9ZnkhpgHPdy93kHI1dqHV5g+M0MwRXWyog==",
+                    Deleted = false
+                }
+            ]);
 
             base.OnModelCreating(modelBuilder);
         }

@@ -1,40 +1,32 @@
-﻿using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using TaskManagerApi.Data;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using TaskManagerApi.DTOs;
-using TaskManagerApi.Models;
+using TaskManagerApi.Services;
 
 namespace TaskManagerApi.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize]
     public class TaskItemsController : ControllerBase
     {
-        private readonly TaskManagerContext taskManagerContext;
+        private readonly ITaskService _taskService;
 
-        public TaskItemsController(TaskManagerContext taskManagerContext)
+        public TaskItemsController(ITaskService taskService)
         {
-            this.taskManagerContext = taskManagerContext;
+            _taskService = taskService;
         }
 
         [HttpGet]
         public async Task<IActionResult> GetTasks(int page = 1, int pageSize = 10)
         {
-            var skip = (page - 1) * pageSize;
-
-            var tasks = await taskManagerContext.TaskItems
-                .Where(i => i.Deleted == false)
-                .Skip(skip)
-                .Take(pageSize)
-                .ToListAsync();
-
-            return Ok(tasks);
+            return Ok(await _taskService.GetTasks(page, pageSize));
         }
 
         [HttpGet("{id}")]
         public async Task<IActionResult> GetTask(long id)
         {
-            var task = await taskManagerContext.TaskItems.FirstOrDefaultAsync(i => i.Id == id && i.Deleted == false);
+            var task = await _taskService.GetTaskById(id);
             if (task == null)
                 return NotFound(new ErrorResponse
                 {
@@ -49,29 +41,16 @@ namespace TaskManagerApi.Controllers
         [HttpPost]
         public async Task<IActionResult> CreateTask([FromBody] TaskItemDTO task)
         {
-            var addTask = new TaskItem() 
-            { 
-                Title = task.Title,
-                Description = task.Description,
-                Priority = task.Priority,
-                IsCompleted = false,
-                CreatedAt = DateTime.UtcNow,
-                CreatedBy = "-",
-                Deleted = false
-            };
-
-            await taskManagerContext.TaskItems.AddAsync(addTask);
-            await taskManagerContext.SaveChangesAsync();
-
-            return CreatedAtAction(nameof(GetTask), new { id = addTask.Id }, new { addTask.Id });
+            var id = await _taskService.CreateTask(task);
+            return CreatedAtAction(nameof(GetTask), new { id }, new { id });
         }
 
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdateTask(long id, TaskItemDTO task)
         {
-            var updateTask = await taskManagerContext.TaskItems.Where(i => i.Id == id).FirstOrDefaultAsync();
+            var res = await _taskService.UpdateTask(id, task);
 
-            if (updateTask == null)
+            if (res == false)
                 return NotFound(new ErrorResponse
                 {
                     StatusCode = StatusCodes.Status404NotFound,
@@ -79,22 +58,14 @@ namespace TaskManagerApi.Controllers
                     TraceId = HttpContext.TraceIdentifier
                 });
 
-            updateTask.Title = task.Title;
-            updateTask.Description = task.Description;
-            updateTask.Priority = task.Priority;
-            updateTask.IsCompleted = task.IsCompleted;
-            updateTask.ModifiedAt = DateTime.UtcNow;
-            updateTask.ModifiedBy = "-";
-
-            await taskManagerContext.SaveChangesAsync();
             return NoContent();
         }
 
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteTask(long id)
         {
-            var deleteTask = await taskManagerContext.TaskItems.FirstOrDefaultAsync(i => i.Id == id && i.Deleted == false);
-            if (deleteTask == null)
+            var res = await _taskService.DeleteTask(id);
+            if (res == false)
                 return NotFound(new ErrorResponse
                 {
                     StatusCode = StatusCodes.Status404NotFound,
@@ -102,11 +73,6 @@ namespace TaskManagerApi.Controllers
                     TraceId = HttpContext.TraceIdentifier
                 });
 
-            deleteTask.Deleted = true;
-            deleteTask.ModifiedAt = DateTime.UtcNow;
-            deleteTask.ModifiedBy = "-";
-
-            await taskManagerContext.SaveChangesAsync();
             return NoContent();
         }
     }
