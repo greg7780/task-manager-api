@@ -27,14 +27,6 @@ namespace TaskManagerApi.Controllers
         public async Task<IActionResult> GetTask(long id)
         {
             var task = await _taskService.GetTaskById(id);
-            if (task == null)
-                return NotFound(new ErrorResponse
-                {
-                    StatusCode = StatusCodes.Status404NotFound,
-                    Message = $"Task with id {id} not found.",
-                    TraceId = HttpContext.TraceIdentifier
-                });
-
             return Ok(task);
         }
 
@@ -48,31 +40,14 @@ namespace TaskManagerApi.Controllers
         [HttpPut("{id}")]
         public async Task<IActionResult> UpdateTask(long id, TaskItemDTO task)
         {
-            var res = await _taskService.UpdateTask(id, task);
-
-            if (res == false)
-                return NotFound(new ErrorResponse
-                {
-                    StatusCode = StatusCodes.Status404NotFound,
-                    Message = $"Task with id {id} not found.",
-                    TraceId = HttpContext.TraceIdentifier
-                });
-
+            await _taskService.UpdateTask(id, task);
             return NoContent();
         }
 
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteTask(long id)
         {
-            var res = await _taskService.DeleteTask(id);
-            if (res == false)
-                return NotFound(new ErrorResponse
-                {
-                    StatusCode = StatusCodes.Status404NotFound,
-                    Message = $"Task with id {id} not found.",
-                    TraceId = HttpContext.TraceIdentifier
-                });
-
+            await _taskService.DeleteTask(id);
             return NoContent();
         }
     }

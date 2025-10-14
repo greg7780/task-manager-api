@@ -1,6 +1,7 @@
 ﻿using System.Net;
 using System.Text.Json;
 using TaskManagerApi.DTOs;
+using TaskManagerApi.Exceptions;
 
 namespace TaskManagerApi.Middlewares
 {
@@ -20,6 +21,20 @@ namespace TaskManagerApi.Middlewares
             try
             {
                 await _next(context);
+            }
+            catch (HttpResponseException ex)
+            {
+                context.Response.StatusCode = ex.StatusCode;
+                context.Response.ContentType = "application/json";
+
+                var errorResponse = new ErrorResponse
+                {
+                    StatusCode = ex.StatusCode,
+                    Message = ex.Message,
+                    TraceId = context.TraceIdentifier
+                };
+
+                await context.Response.WriteAsJsonAsync(errorResponse);
             }
             catch (Exception ex)
             {

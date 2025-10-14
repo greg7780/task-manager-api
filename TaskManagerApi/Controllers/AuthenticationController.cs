@@ -17,13 +17,18 @@ namespace TaskManagerApi.Controllers
         }
 
         [AllowAnonymous]
+        [HttpPost("register")]
+        public async Task<IActionResult> Register(RegisterRequestDTO request)
+        {
+            var res = await _authenticationService.Register(request);
+            return Ok(res);
+        }
+
+        [AllowAnonymous]
         [HttpPost("login")]
         public async Task<IActionResult> Login(LoginRequestDTO request)
         {
             var res = await _authenticationService.Login(request);
-             
-            if (string.IsNullOrWhiteSpace(res.Username)) return Unauthorized(new { message = res.Message });
-
             return Ok(res);
         }
 
@@ -32,7 +37,6 @@ namespace TaskManagerApi.Controllers
         public async Task<IActionResult> Refresh([FromBody] string refreshToken)
         {
             var res = await _authenticationService.RefreshToken(refreshToken);
-            if (string.IsNullOrWhiteSpace(res.Username)) return Unauthorized(new { message = res.Message });
             return Ok(res);
         }
     }

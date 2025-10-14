@@ -1,6 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using TaskManagerApi.Data;
 using TaskManagerApi.DTOs;
+using TaskManagerApi.Exceptions;
 using TaskManagerApi.Models;
 
 namespace TaskManagerApi.Services
@@ -10,8 +11,8 @@ namespace TaskManagerApi.Services
         Task<List<TaskItem>> GetTasks(int page, int pageSize);
         Task<TaskItem?> GetTaskById(long id);
         Task<long> CreateTask(TaskItemDTO dto);
-        Task<bool> UpdateTask(long id, TaskItemDTO dto);
-        Task<bool> DeleteTask(long id);
+        Task UpdateTask(long id, TaskItemDTO dto);
+        Task DeleteTask(long id);
     }
 
     public class TaskService : ITaskService
@@ -20,7 +21,7 @@ namespace TaskManagerApi.Services
 
         public TaskService(TaskManagerContext taskManagerContext)
         {
-            this._taskManagerContext = taskManagerContext;
+            _taskManagerContext = taskManagerContext;
         }
 
         public async Task<List<TaskItem>> GetTasks(int page, int pageSize)
@@ -38,8 +39,13 @@ namespace TaskManagerApi.Services
 
         public async Task<TaskItem?> GetTaskById(long id)
         {
-            return await _taskManagerContext.TaskItems
+            var task = await _taskManagerContext.TaskItems
                 .FirstOrDefaultAsync(i => i.Id == id && i.Deleted == false);
+
+            if (task == null)
+                throw new NotFoundException($"Task with id {id} not found.");
+
+            return task;
         }
 
         public async Task<long> CreateTask(TaskItemDTO dto)
@@ -61,13 +67,12 @@ namespace TaskManagerApi.Services
             return newTask.Id;
         }
 
-        public async Task<bool> UpdateTask(long id, TaskItemDTO dto)
+        public async Task UpdateTask(long id, TaskItemDTO dto)
         {
             var existingTask = await _taskManagerContext.TaskItems
                 .FirstOrDefaultAsync(i => i.Id == id && i.Deleted == false);
 
-            if (existingTask == null)
-                return false;
+            if (existingTask == null) throw new NotFoundException($"Task with id {id} not found.");
 
             existingTask.Title = dto.Title;
             existingTask.Description = dto.Description;
@@ -77,23 +82,20 @@ namespace TaskManagerApi.Services
             existingTask.ModifiedBy = "-";
 
             await _taskManagerContext.SaveChangesAsync();
-            return true;
         }
 
-        public async Task<bool> DeleteTask(long id)
+        public async Task DeleteTask(long id)
         {
             var existingTask = await _taskManagerContext.TaskItems
                 .FirstOrDefaultAsync(i => i.Id == id && i.Deleted == false);
 
-            if (existingTask == null)
-                return false;
+            if (existingTask == null) throw new NotFoundException($"Task with id {id} not found.");
 
             existingTask.Deleted = true;
             existingTask.ModifiedAt = DateTime.UtcNow;
             existingTask.ModifiedBy = "-";
 
             await _taskManagerContext.SaveChangesAsync();
-            return true;
         }
     }
 }

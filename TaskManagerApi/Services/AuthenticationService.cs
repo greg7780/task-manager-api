@@ -1,11 +1,13 @@
 ﻿using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
+using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 using TaskManagerApi.Data;
 using TaskManagerApi.DTOs;
+using TaskManagerApi.Exceptions;
 using TaskManagerApi.Handlers;
 using TaskManagerApi.Models;
 
@@ -22,13 +24,39 @@ namespace TaskManagerApi.Services
             _configuration = configuration;
         }
 
+        public async Task<RegisterResponseDTO> Register(RegisterRequestDTO request)
+        {
+            var isUsernamePicked = await _taskManagerContext.Users
+                .AnyAsync(i => i.Username == request.Username);
+
+            if (isUsernamePicked) throw new ConflictException("Username already being used, please try another one");
+
+            if (request.Password != request.ConfirmPassword) throw new BadRequestException("Password and Confirm Password do not match");
+
+            var newUser = new User()
+            {
+                Username = request.Username,
+                Password = PasswordHashHandler.HashPassword(request.Password),
+                Deleted = false
+            };
+
+            await _taskManagerContext.Users.AddAsync(newUser);
+            await _taskManagerContext.SaveChangesAsync();
+
+            return new RegisterResponseDTO
+            {
+                Username = request.Username,
+                Message = "Register successful, please continue login"
+            };
+        }
+
         public async Task<LoginResponseDTO> Login(LoginRequestDTO request)
         {
             var user = await _taskManagerContext.Users
                 .FirstOrDefaultAsync(i => i.Username == request.Username);
 
             if (user == null || !PasswordHashHandler.VerifyHashedPassword(user.Password, request.Password))
-                return new LoginResponseDTO { Message = "Invalid username or password" };
+                throw new UnauthorizedException("Invalid username or password");
 
             var accessToken = JwtTokenHandler.GenerateToken(user, _configuration);
 
@@ -55,7 +83,7 @@ namespace TaskManagerApi.Services
                 .FirstOrDefaultAsync(r => r.Token == token);
 
             if (refreshToken == null || refreshToken.User == null || refreshToken.Expires < DateTime.UtcNow)
-                return new LoginResponseDTO { Message = "Invalid or expired refresh token" };
+                throw new UnauthorizedException("Invalid or expired refresh token");
 
             var newAccessToken = JwtTokenHandler.GenerateToken(refreshToken.User, _configuration);
             return new LoginResponseDTO
@@ -71,10 +99,10 @@ namespace TaskManagerApi.Services
         {
             var refreshTokenValidityDays = _configuration.GetValue<int>("JwtConfig:RefreshTokenValidityDays");
             var randomBytes = RandomNumberGenerator.GetBytes(64);
-            return new RefreshToken() 
-            { 
-                Token = Convert.ToBase64String(randomBytes), 
-                Expires = DateTime.UtcNow.AddDays(refreshTokenValidityDays), 
+            return new RefreshToken()
+            {
+                Token = Convert.ToBase64String(randomBytes),
+                Expires = DateTime.UtcNow.AddDays(refreshTokenValidityDays),
                 UserId = 0
             };
         }
